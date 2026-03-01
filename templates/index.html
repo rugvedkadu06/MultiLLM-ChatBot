@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MLLM | Multi-LLM Interface</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500&amp;family=Syne:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            nexus: {
+              bg: '#0a0a0f',
+              card: '#12121e',
+              purple: '#8b5cf6',
+              teal: '#14b8a6',
+              border: '#2a2a3c',
+              botBg: 'rgba(20, 184, 166, 0.05)',
+              userBg: 'rgba(139, 92, 246, 0.05)',
+            }
+          },
+          fontFamily: {
+            sans: ['Syne', 'sans-serif'],
+            mono: ['DM Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+<!-- Custom Typography & Glow Effects -->
+<style data-purpose="typography">
+    body {
+      font-family: 'Syne', sans-serif;
+      background-color: #0a0a0f;
+      color: #e2e8f0;
+    }
+    .font-mono {
+      font-family: 'DM Mono', monospace;
+    }
+  </style>
+<style data-purpose="glassmorphism-effects">
+    .glass-panel {
+      background: rgba(18, 18, 30, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .neon-glow-purple {
+      box-shadow: 0 0 20px rgba(139, 92, 246, 0.15);
+    }
+    .neon-glow-teal {
+      box-shadow: 0 0 20px rgba(20, 184, 166, 0.15);
+    }
+    .gradient-text {
+      background: linear-gradient(135deg, #8b5cf6, #14b8a6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .gradient-bg {
+      background: linear-gradient(135deg, #8b5cf6, #14b8a6);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #2a2a3c;
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3f3f5a;
+    }
+  </style>
+<style>
+    .msg {
+      display: flex;
+      gap: 1rem;
+      max-width: 100%;
+      margin-bottom: 2rem;
+      animation: fadeIn 0.3s ease-out;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .msg.user { flex-direction: row-reverse; }
+    .avatar {
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    .user .avatar { background: #8b5cf6; color: white; }
+    .bot .avatar { background: #14b8a6; color: #0a0a0f; }
+    .bubble-wrap { display: flex; flex-direction: column; max-width: 80%; }
+    .user .bubble-wrap { align-items: flex-end; }
+    .bubble-meta { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; font-size: 0.75rem; }
+    .bubble-name { font-weight: 700; }
+    .bubble-time { color: #64748b; font-family: 'DM Mono', monospace; font-size: 10px; }
+    .model-tag { background: rgba(20, 184, 166, 0.1); color: #14b8a6; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 10px; border: 1px solid rgba(20, 184, 166, 0.2); }
+    .bubble {
+      padding: 1rem;
+      border-radius: 1rem;
+      line-height: 1.6;
+      font-size: 0.95rem;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .user .bubble { background: rgba(139, 92, 246, 0.05); border-color: rgba(139, 92, 246, 0.2); border-top-right-radius: 0; }
+    .bot .bubble { background: rgba(20, 184, 166, 0.05); border-color: rgba(20, 184, 166, 0.2); border-top-left-radius: 0; }
+    .typing-dots { display: flex; gap: 4px; }
+    .typing-dots span { width: 6px; height: 6px; background: #14b8a6; border-radius: 50%; animation: bounce 1.4s infinite ease-in-out; }
+    .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
+  </style></head>
+<body class="h-screen flex flex-col overflow-hidden">
+<!-- BEGIN: Navigation -->
+<header class="h-16 border-b border-nexus-border px-6 flex items-center justify-between glass-panel z-50" data-purpose="main-header">
+<div class="flex items-center gap-3">
+<!-- Nexus Logo -->
+<div class="w-2 h-8 bg-nexus-purple rounded-full"></div>
+<h1 class="text-2xl font-black tracking-widest uppercase">MLLM</h1>
+</div>
+<div class="flex items-center gap-4">
+<!-- Model Selector -->
+<div class="relative flex items-center gap-2 bg-transparent border border-nexus-border/50 px-3 py-1.5 rounded-lg text-[11px] font-mono transition-all text-slate-400"><span class="w-2 h-2 rounded-full bg-nexus-teal animate-pulse"></span><select class="bg-transparent border-none p-0 focus:ring-0 text-[11px] cursor-pointer appearance-none pr-4" id="modelSelect"></select></div>
+<!-- User Profile -->
+<div class="w-10 h-10 rounded-full border border-nexus-border overflow-hidden bg-slate-800 flex items-center justify-center">
+<span class="text-xs font-mono">MLLM</span>
+</div>
+</div>
+</header>
+<!-- END: Navigation -->
+<!-- BEGIN: Main Layout -->
+<main class="flex-1 flex overflow-hidden relative" data-purpose="main-content-area">
+<!-- Ambient Background Glows -->
+<div class="absolute top-1/4 -left-20 w-96 h-96 bg-nexus-purple/10 blur-[120px] rounded-full pointer-events-none"></div>
+<div class="absolute bottom-1/4 -right-20 w-96 h-96 bg-nexus-teal/10 blur-[120px] rounded-full pointer-events-none"></div>
+<!-- BEGIN: Sidebar (Optional for high-fidelity dash) -->
+<!-- END: Sidebar -->
+<!-- BEGIN: Chat Viewport -->
+<section class="flex-1 flex flex-col relative z-10 max-w-4xl mx-auto w-full" id="chat-viewport">
+<!-- Message List -->
+<div class="flex-1 overflow-y-auto p-6 md:p-10 space-y-8" id="messages">
+<!-- BEGIN: Empty State (Shown by default) -->
+<div class="h-full flex flex-col items-center justify-center" data-purpose="empty-state" id="emptyState"><div class="text-center space-y-4"><h2 class="text-5xl font-black tracking-tighter opacity-20">MLLM</h2><p class="font-mono text-xs tracking-widest uppercase text-slate-500">Ready for uplink</p></div></div>
+<!-- END: Empty State -->
+<!-- EXAMPLE: Bot Message (Hidden initially or for reference) -->
+<!--
+        <div class="flex gap-4 max-w-4xl mx-auto">
+          <div class="w-10 h-10 rounded-lg bg-nexus-teal flex-shrink-0 flex items-center justify-center shadow-lg">
+             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-nexus-bg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+          </div>
+          <div class="space-y-2">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-sm">Nexus Core</span>
+              <span class="text-[10px] font-mono text-slate-500">12:45 PM</span>
+            </div>
+            <div class="p-4 rounded-2xl rounded-tl-none bg-nexus-botBg border border-nexus-teal/20 text-slate-300 leading-relaxed">
+              Hello, Developer. I've initialized the GPT-4o instance. How can I assist with your architectural design today?
+            </div>
+          </div>
+        </div>
+        -->
+</div>
+<!-- BEGIN: Input Area -->
+<div class="p-6 md:p-10 max-w-5xl w-full mx-auto" data-purpose="input-section">
+<div class="relative bg-nexus-card/50 border border-nexus-border rounded-2xl p-2 transition-all focus-within:border-nexus-purple/30 shadow-sm">
+<textarea class="w-full bg-transparent border-none focus:ring-0 text-slate-200 placeholder-slate-500 font-mono text-sm py-4 px-4 resize-none" id="messageInput" placeholder="Message MLLM..." rows="1"></textarea>
+<div class="flex items-center justify-between px-4 pb-2">
+<div class="flex gap-4 text-slate-500">
+<button class="hover:text-nexus-teal transition-colors" title="Upload File">
+<svg class="h-5 w-5" fill="none" stroke="currentColor" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+<button class="hover:text-nexus-purple transition-colors" title="Code Block">
+<svg class="h-5 w-5" fill="none" stroke="currentColor" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+</div>
+<button class="bg-white text-black px-5 py-2 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-2" id="sendBtn" onclick="sendMessage()"><span class="text-xs font-bold tracking-widest">SEND</span><svg class="h-3 w-3" fill="none" stroke="currentColor" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path></svg></button>
+</div>
+</div>
+<p class="text-center text-[10px] text-slate-600 mt-4 uppercase tracking-[0.2em] font-mono">
+          System Status: <span class="text-nexus-teal">Operational</span> | Latency: 24ms
+        </p>
+</div>
+<!-- END: Input Area -->
+</section>
+<!-- END: Chat Viewport -->
+</main>
+<!-- END: Main Layout -->
+<script>
+  // ── Helpers ──────────────────────────────────────────────
+  function now() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+  }
+
+  // ── State ────────────────────────────────────────────────
+  let isLoading = false;
+
+  // ── Load models ──────────────────────────────────────────
+  async function loadModels() {
+    try {
+      const res = await fetch('/models');
+      const models = await res.json();
+      const select = document.getElementById('modelSelect');
+
+      models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m; opt.text = m;
+        select.appendChild(opt);
+      });
+    } catch {
+      // Show fallback if endpoint not available (demo mode)
+      const select = document.getElementById('modelSelect');
+      if (select) {
+          ['GPT-4o (Omni)', 'Claude 3.5 Sonnet', 'Gemini 2.0 Flash', 'Llama 3.3 70B'].forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m; opt.text = m;
+            select.appendChild(opt);
+          });
+      }
+    }
+  }
+
+  // ── Render message ───────────────────────────────────────
+  function appendMessage(role, text, model) {
+    const messages = document.getElementById('messages');
+    const empty = document.getElementById('emptyState');
+    if (empty) empty.style.display = 'none';
+
+    const isUser = role === 'user';
+    const initial = isUser ? 'U' : '✦';
+
+    const msg = document.createElement('div');
+    msg.className = `msg ${role}`;
+
+    msg.innerHTML = `
+      <div class="avatar">${initial}</div>
+      <div class="bubble-wrap">
+        <div class="bubble-meta">
+          <span class="bubble-name">${isUser ? 'You' : 'Assistant'}</span>
+          ${!isUser && model ? `<span class="model-tag">${model}</span>` : ''}
+          <span class="bubble-time">${now()}</span>
+        </div>
+        <div class="bubble">${escapeHtml(text)}</div>
+      </div>
+    `;
+
+    messages.appendChild(msg);
+    messages.scrollTop = messages.scrollHeight;
+    return msg;
+  }
+
+  function appendTyping() {
+    const messages = document.getElementById('messages');
+    const empty = document.getElementById('emptyState');
+    if (empty) empty.style.display = 'none';
+
+    const msg = document.createElement('div');
+    msg.className = 'msg bot typing';
+    msg.id = 'typingIndicator';
+    msg.innerHTML = `
+      <div class="avatar">✦</div>
+      <div class="bubble-wrap">
+        <div class="bubble">
+          <div class="typing-dots"><span></span><span></span><span></span></div>
+        </div>
+      </div>
+    `;
+    messages.appendChild(msg);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  function removeTyping() {
+    const t = document.getElementById('typingIndicator');
+    if (t) t.remove();
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Send ─────────────────────────────────────────────────
+  async function sendMessage() {
+    if (isLoading) return;
+    const input = document.getElementById('messageInput');
+    const modelSelect = document.getElementById('modelSelect');
+    const model = modelSelect ? modelSelect.value : 'default-model';
+    const message = input.value.trim();
+    if (!message) return;
+
+    input.value = '';
+    input.style.height = 'auto';
+    isLoading = true;
+    const sendBtn = document.getElementById('sendBtn');
+    if (sendBtn) sendBtn.disabled = true;
+
+    appendMessage('user', message, null);
+    appendTyping();
+
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, message })
+      });
+      const data = await res.json();
+      removeTyping();
+      appendMessage('bot', data.reply || '(no response)', model);
+    } catch (err) {
+      setTimeout(() => {
+        removeTyping();
+        // Demo fallback
+        appendMessage('bot', `[Demo Mode] This is a response from ${model}. In a live environment, this would call your /chat endpoint.`, model);
+      }, 800);
+    }
+
+    isLoading = false;
+    if (sendBtn) sendBtn.disabled = false;
+    input.focus();
+  }
+
+  // ── Keyboard ─────────────────────────────────────────────
+  const messageInput = document.getElementById('messageInput');
+  if (messageInput) {
+      messageInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+
+      messageInput.addEventListener('input', function() {
+        autoResize(this);
+      });
+      messageInput.focus();
+  }
+
+  // ── Init ─────────────────────────────────────────────────
+  loadModels();
+</script>
+</body></html>
